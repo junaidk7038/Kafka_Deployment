@@ -1,0 +1,188 @@
+sudo yum install curl which
+sudo rpm --import https://packages.confluent.io/rpm/5.3/archive.key
+
+sudo su -c 'cat >> /etc/yum.repos.d/confluent.repo << EOL
+[Confluent.dist]
+name=Confluent repository (dist)
+baseurl=https://packages.confluent.io/rpm/5.3/7
+gpgcheck=1
+gpgkey=https://packages.confluent.io/rpm/5.3/archive.key
+enabled=1
+
+[Confluent]
+name=Confluent repository
+baseurl=https://packages.confluent.io/rpm/5.3
+gpgcheck=1
+gpgkey=https://packages.confluent.io/rpm/5.3/archive.key
+enabled=1
+EOL'
+
+sudo su -c 'cat >> /etc/hosts << EOL
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+10.10.0.45    node1.server.com node1
+10.10.0.46    node2.server.com node2
+10.10.0.47    node3.server.com node3
+EOL'
+
+sudo yum clean all
+sudo yum install confluent-platform-2.12 -y
+
+sudo yum install java-1.8.0-openjdk.x86_64 -y
+
+sudo chmod -R 777 /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.372.b07-1.el7_9.x86_64/
+
+echo "export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.372.b07-1.el7_9.x86_64/jre/" >> .bashrc
+echo "export PATH=$PATH:$JAVA_HOME/bin" >> .bashrc
+source .bashrc
+
+java-1.8.0-openjdk-1.8.0.272.b10-1.el7_9.x86_64/
+
+
+
+sudo vi /etc/kafka/zookeeper.properties
+tickTime=2000
+dataDir=/var/lib/zookeeper/
+clientPort=2181
+initLimit=5
+syncLimit=2
+server.1=:2888:3888
+server.2=:2888:3888
+server.3=:2888:3888
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=24
+
+
+https://docs.confluent.io/platform/current/zookeeper/deployment.html
+
+sudo vi /var/lib/zookeeper/myid
+Assign 1, 2 , 3 on all nodes
+
+
+
+Create log.dirs = /data/kafka/kafka_log
+Assign Permission
+
+sudo vi /etc/kafka/server.properties
+broker.id.generation.enable = true
+listeners=PLAINTEXT://:9092
+advertised.listeners=PLAINTEXT://:9092
+super.users=User:kafkabroker
+num.network.threads = 2
+num.io.threads = 8
+default.replication.factor = 1
+min.insync.replicas=1
+delete.topic.enable = true
+socket.send.buffer.bytes = 102400
+socket.receive.buffer.bytes = 102400
+socket.request.max.bytes =104857600
+log.dirs = /data/kafka/kafka_log
+num.partitions = 6
+num.recovery.threads.per.data.dir = 1
+offsets.topic.replication.factor = 1
+log.retention.hours = 72
+log.segment.bytes = 1073741824
+log.retention.check.interval.ms = 300000
+zookeeper.connect = :2181
+zookeeper.connection.timeout.ms = 6000
+
+
+
+CONTROL CENTER:>>>>>
+
+sudo vi /etc/confluent-control-center/control-center-production.properties 
+
+bootstrap.servers=node1.server.com:9092,node2.server.com:9092,node3.server.com:9092
+confluent.controlcenter.data.dir=/var/lib/confluent/control-center
+zookeeper.connect=node1.server.com:2181,node2.server.com:2181,node3.server.com:2181
+confluent.controlcenter.internal.topic.partitions=6
+confluent.controlcenter.internal.topic.replication=3
+confluent.controlcenter.command.topic.replication=3
+confluent.monitoring.interceptor.topic.partitions=6
+confluent.monitoring.interceptor.topic.replication=3
+confluent.metrics.topic.partitions=6
+confluent.metrics.topic.replication=3
+
+
+
+sudo vi /etc/kafka/server.properties
+
+metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+
+confluent.metrics.reporter.bootstrap.servers=Pseudocluster:9092
+confluent.metrics.reporter.topic.replicas=1
+
+
+sudo vi /etc/kafka/connect-distributed.properties
+
+bootstrap.servers=node1.server.com:9092,node2.server.com:9092,node3.server.com:9092
+
+#Interceptor setup
+consumer.interceptor.classes=io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+producer.interceptor.classes=io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+
+
+Schema Registry : >>>>
+sudo vi /etc/schema-registry/schema-registry.properties
+
+listeners=http://35.207.22.118:8081,35.211.197.50:8081,35.211.235.230:8081
+kafkastore.bootstrap.servers=PLAINTEXT://node1.server.com:9092,node2.server.com:9092,node3.server.com:9092
+kafkastore.connection.url=node1.server.com:2181,node2.server.com:2181,node3.server.com:2181
+
+
+REST PROXY
+
+sudo vi /etc/kafka-rest/kafka-rest.properties
+
+bootstrap.servers=node1.server.com:9092,node2.server.com:9092,node3.server.com:9092
+zookeeper.connect=node1.server.com:2181,node2.server.com:2181,node3.server.com:2181
+
+
+SERVICES START>>>>>>>>>
+
+
+sudo systemctl start confluent-zookeeper
+sudo systemctl enable confluent-zookeeper
+
+sudo systemctl start confluent-kafka
+sudo systemctl enable confluent-kafka
+
+kafka-topics --list --bootstrap-server hostname:9092
+
+
+sudo systemctl status confluent-control-center
+sudo systemctl start confluent-control-center
+
+
+sudo systemctl start confluent-schema-registry
+sudo systemctl start confluent-control-center
+sudo systemctl start confluent-kafka-connect
+sudo systemctl start confluent-kafka-rest
+sudo systemctl start confluent-ksql
+
+
+
+
+
+
+
+
+
+
+
+
+sudo su -c 'cat >> /etc/yum.repos.d/confluent.repo << EOL
+[Confluent]
+name=Confluent repository
+baseurl=https://packages.confluent.io/rpm/7.3
+gpgcheck=1
+gpgkey=https://packages.confluent.io/rpm/7.3/archive.key
+enabled=1
+
+[Confluent-Clients]
+name=Confluent Clients repository
+baseurl=https://packages.confluent.io/clients/rpm/centos/$releasever/$basearch
+gpgcheck=1
+gpgkey=https://packages.confluent.io/clients/rpm/archive.key
+enabled=1
+EOL'
